@@ -1,0 +1,291 @@
+I am uploading the official logo for the application.
+
+Do NOT copy any external design.
+Create a completely original design.
+
+The UI color system must be inspired by the uploaded logo.
+
+Primary brand colors should be derived from:
+
+Teal / Aqua Green (from checkmark)
+
+Soft Blue-Green tones
+
+White
+
+Light cool neutral backgrounds
+
+The final UI must look professional, modern, minimal, and production-ready — not colorful or childish.
+
+📱 APP NAME
+
+Attendkar
+
+Build using Flutter so it supports both Android and iOS.
+
+🎨 BRAND & UI DESIGN SYSTEM
+
+Use the uploaded logo as:
+
+App icon
+
+Splash screen logo
+
+Create a professional color system:
+
+Primary Color → Teal/Aqua (from logo)
+
+Secondary Color → Soft blue-green
+
+Background → Light cool grey or very light mint tint
+
+Error → Soft red
+
+Success → Muted green
+
+Text → Dark charcoal (not pure black)
+
+Design must include:
+
+Clean minimal layout
+
+Rounded cards (16px radius)
+
+Soft shadows
+
+Consistent spacing
+
+Smooth but lightweight animations
+
+Professional typography (Inter, Poppins, or system font)
+
+Material 3 principles
+
+Avoid:
+
+Harsh neon colors
+
+Heavy gradients
+
+Overuse of animations
+
+Cluttered layouts
+
+The app must feel like a premium productivity or fintech app.
+
+⚡ PERFORMANCE REQUIREMENTS
+
+The app must:
+
+Run smoothly on low-end devices (2GB RAM)
+
+Support Android 8+
+
+Have small APK size
+
+Avoid heavy third-party packages
+
+Use optimized local database
+
+Use lightweight animations only
+
+Prevent memory leaks
+
+Maintain fast startup time
+
+Handle multiple years of attendance data smoothly
+
+Be battery efficient
+
+📱 FIRST TIME USER FLOW
+
+On first launch:
+
+Collect:
+
+Full Name
+
+Course
+
+Roll Number
+
+Add Multiple Subjects
+
+Requirements:
+
+Clean onboarding flow
+
+Smooth but lightweight transitions
+
+Editable later from Settings
+
+Save locally
+
+📅 DAILY ATTENDANCE SYSTEM
+
+The app must:
+
+Automatically generate a new attendance sheet every day.
+
+Save all previous records permanently.
+
+Show history in Analytics.
+
+Each new day must automatically include all active subjects.
+
+📝 DAILY ATTENDANCE SCREEN
+
+Each subject must have 4 selectable states:
+
+Present
+
+Absent
+
+Class Not Taken
+
+No Class
+
+Only one selectable at a time (radio-style).
+
+Default state: unselected.
+
+📊 LOGIC RULES
+
+Present → Increase total classes + present count
+
+Absent → Increase total classes only
+
+Class Not Taken → Do NOT increase total classes
+
+No Class → Do NOT increase total classes
+
+📈 PERCENTAGE FORMULA
+percentage = (present / total_effective_classes) × 100
+
+Where:
+
+total_effective_classes = Present + Absent
+
+Handle division by zero safely.
+
+🔒 END OF DAY CONTROL
+
+At bottom of daily sheet:
+
+Section Title: Is Today Closed?
+
+Options:
+
+Yes
+
+No
+
+If Yes:
+
+Lock editing
+
+Show subtle “Day Closed” badge
+
+Prevent modification
+
+Include:
+
+Optional “Reason” field.
+
+Save it in history.
+
+📊 ANALYTICS SECTION
+
+Show:
+
+Subject-wise percentage
+
+Total classes
+
+Total present
+
+Monthly summary
+
+Date-wise history list
+
+Clicking a date should show:
+
+All subject statuses
+
+Closed status
+
+Reason (if provided)
+
+Charts must be minimal and lightweight.
+
+⚙ SETTINGS SCREEN
+
+Allow:
+
+Edit Name
+
+Edit Course
+
+Edit Roll Number
+
+Add Subject
+
+Edit Subject Name (update everywhere including past records)
+
+Delete Subject (with confirmation)
+
+Dark Mode toggle
+
+Reset All Data (with confirmation)
+
+🧠 TECHNICAL STRUCTURE
+
+Flutter with null safety
+
+Hive or SQLite
+
+Clean architecture:
+
+models
+
+services
+
+screens
+
+widgets
+
+utils
+
+Reusable components
+
+Production-ready code
+
+No unnecessary dependencies
+
+Optimized build size
+
+No runtime crashes
+
+Proper error handling
+
+✨ FINAL USER EXPERIENCE GOAL
+
+The app must feel:
+
+Professional
+
+Minimal
+
+Clean
+
+Fast
+
+Lightweight
+
+Reliable
+
+Modern
+
+Suitable for Play Store
+
+It must look like a real startup productivity app.
