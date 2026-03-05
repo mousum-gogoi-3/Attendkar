@@ -13,61 +13,22 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _courseController = TextEditingController();
-  final _rollNoController = TextEditingController();
-  
-  final List<TextEditingController> _subjectControllers = [
-    TextEditingController()
-  ];
 
   @override
   void dispose() {
     _nameController.dispose();
-    _courseController.dispose();
-    _rollNoController.dispose();
-    for (var c in _subjectControllers) {
-      c.dispose();
-    }
     super.dispose();
-  }
-
-  void _addSubjectField() {
-    setState(() => _subjectControllers.add(TextEditingController()));
-  }
-
-  void _removeSubjectField(int index) {
-    if (_subjectControllers.length > 1) {
-      setState(() {
-        _subjectControllers[index].dispose();
-        _subjectControllers.removeAt(index);
-      });
-    }
   }
 
   Future<void> _saveAndContinue() async {
     if (_formKey.currentState!.validate()) {
-      bool hasSubjects = _subjectControllers.any((c) => c.text.trim().isNotEmpty);
-      if (!hasSubjects) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please add at least one subject.')),
-        );
-        return;
-      }
-
       final provider = Provider.of<AttendanceProvider>(context, listen: false);
       
       await provider.saveProfile(
         _nameController.text.trim(),
-        _courseController.text.trim(),
-        _rollNoController.text.trim(),
+        '', // Empty course
+        provider.userProfile?.rollNumber ?? '', // Preserve existing roll number
       );
-
-      for (var controller in _subjectControllers) {
-        final text = controller.text.trim();
-        if (text.isNotEmpty) {
-          await provider.addSubject(text);
-        }
-      }
 
       if (!mounted) return;
       
@@ -115,61 +76,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   label: 'Full Name',
                   icon: Icons.person_outline,
                 ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  controller: _courseController,
-                  label: 'Course',
-                  icon: Icons.school_outlined,
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  controller: _rollNoController,
-                  label: 'Roll Number',
-                  icon: Icons.numbers,
-                ),
-                
-                const SizedBox(height: 48),
-                
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildSectionTitle(context, 'Subjects'),
-                    IconButton(
-                      icon: Icon(Icons.add_circle_outline, color: theme.primaryColor),
-                      onPressed: _addSubjectField,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                
-                ..._subjectControllers.asMap().entries.map((entry) {
-                   int idx = entry.key;
-                   var controller = entry.value;
-                   return Padding(
-                     padding: const EdgeInsets.only(bottom: 12.0),
-                     child: Row(
-                       children: [
-                         Expanded(
-                           child: _buildTextField(
-                             controller: controller,
-                             label: 'Subject ${idx + 1}',
-                             icon: Icons.book_outlined,
-                             validator: idx == 0 
-                               ? (val) => val == null || val.trim().isEmpty ? 'Required' : null
-                               : null,
-                           ),
-                         ),
-                         if (_subjectControllers.length > 1) ...[
-                           const SizedBox(width: 8),
-                           IconButton(
-                             icon: Icon(Icons.remove_circle_outline, color: theme.colorScheme.error),
-                             onPressed: () => _removeSubjectField(idx),
-                           ),
-                         ]
-                       ],
-                     ),
-                   );
-                }),
                 
                 const SizedBox(height: 48),
                 

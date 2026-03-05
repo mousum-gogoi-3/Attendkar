@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'daily_sheet_tab.dart';
-import 'analytics_tab.dart';
 import 'settings_tab.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -16,7 +15,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> _tabs = [
     const DailySheetTab(),
-    const AnalyticsTab(),
     const SettingsTab(),
   ];
 
@@ -43,14 +41,9 @@ class _HomeScreenState extends State<HomeScreen> {
               onDestinationSelected: (index) => setState(() => _currentIndex = index),
               destinations: [
                 NavigationDestination(
-                  icon: Icon(Icons.today_outlined, color: theme.colorScheme.onSurface.withOpacity(0.6)),
-                  selectedIcon: Icon(Icons.today, color: theme.colorScheme.primary),
-                  label: 'Daily',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.analytics_outlined, color: theme.colorScheme.onSurface.withOpacity(0.6)),
-                  selectedIcon: Icon(Icons.analytics, color: theme.colorScheme.primary),
-                  label: 'Analytics',
+                  icon: Icon(Icons.class_outlined, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                  selectedIcon: Icon(Icons.class_, color: theme.colorScheme.primary),
+                  label: 'My Classes',
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.settings_outlined, color: theme.colorScheme.onSurface.withOpacity(0.6)),
