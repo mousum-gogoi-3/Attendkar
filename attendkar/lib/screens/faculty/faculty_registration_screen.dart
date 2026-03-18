@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
-import '../../services/faculty_auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../services/firebase_auth_service.dart';
 import 'faculty_main_screen.dart';
 
 class FacultyRegistrationScreen extends StatefulWidget {
   const FacultyRegistrationScreen({super.key});
 
   @override
-  State<FacultyRegistrationScreen> createState() => _FacultyRegistrationScreenState();
+  State<FacultyRegistrationScreen> createState() =>
+      _FacultyRegistrationScreenState();
 }
 
-class _FacultyRegistrationScreenState extends State<FacultyRegistrationScreen> {
+class _FacultyRegistrationScreenState
+    extends State<FacultyRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _departmentController = TextEditingController();
@@ -19,6 +22,7 @@ class _FacultyRegistrationScreenState extends State<FacultyRegistrationScreen> {
 
   bool _isLoading = false;
   bool _obscurePassword = true;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -31,10 +35,14 @@ class _FacultyRegistrationScreenState extends State<FacultyRegistrationScreen> {
   }
 
   Future<void> _register() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-      bool success = await FacultyAuthService.registerFaculty(
+    try {
+      final success = await FirebaseAuthService.registerFaculty(
         fullName: _nameController.text.trim(),
         department: _departmentController.text.trim(),
         email: _emailController.text.trim(),
@@ -45,22 +53,50 @@ class _FacultyRegistrationScreenState extends State<FacultyRegistrationScreen> {
       setState(() => _isLoading = false);
 
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registration successful! Please login.')),
+        // Retry Firestore profile write in background (in case it failed during registration)
+        FirebaseAuthService.ensureFacultyProfile(
+          fullName: _nameController.text.trim(),
+          department: _departmentController.text.trim(),
+          email: _emailController.text.trim(),
         );
-        Navigator.pop(context); // Go back to login
+        // Navigate directly to main screen – Firebase Auth session is active
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const FacultyMainScreen()),
+          (route) => false,
+        );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registration failed. Email might already exist.')),
-        );
+        setState(() =>
+            _errorMessage = 'Registration failed. Please try again.');
       }
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      String message;
+      switch (e.code) {
+        case 'email-already-in-use':
+          message = 'This email is already registered. Please log in instead.';
+          break;
+        case 'invalid-email':
+          message = 'The email address is not valid.';
+          break;
+        case 'weak-password':
+          message = 'Password is too weak. Use at least 6 characters.';
+          break;
+        case 'network-request-failed':
+          message = 'No internet connection. Please try again.';
+          break;
+        default:
+          message = e.message ?? 'An error occurred during registration.';
+      }
+      setState(() {
+        _isLoading = false;
+        _errorMessage = message;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -82,7 +118,7 @@ class _FacultyRegistrationScreenState extends State<FacultyRegistrationScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Your Faculty ID will be auto-generated.',
+                  'After registering, your classes will be assigned by the Admin.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurface.withOpacity(0.6),
                   ),
@@ -95,19 +131,26 @@ class _FacultyRegistrationScreenState extends State<FacultyRegistrationScreen> {
                   icon: Icons.person_outline,
                 ),
                 const SizedBox(height: 16),
-                
+
                 _buildTextField(
                   controller: _departmentController,
                   label: 'Department',
                   icon: Icons.domain_outlined,
                 ),
                 const SizedBox(height: 16),
-                
+
                 _buildTextField(
                   controller: _emailController,
                   label: 'Email',
                   icon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return 'Please enter your email';
+                    }
+                    if (!val.contains('@')) return 'Enter a valid email';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
 
@@ -117,9 +160,20 @@ class _FacultyRegistrationScreenState extends State<FacultyRegistrationScreen> {
                   icon: Icons.lock_outline,
                   obscureText: _obscurePassword,
                   suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
+                  validator: (val) {
+                    if (val == null || val.length < 6) {
+                      return 'Password must be at least 6 characters';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
 
@@ -129,11 +183,28 @@ class _FacultyRegistrationScreenState extends State<FacultyRegistrationScreen> {
                   icon: Icons.lock_outline,
                   obscureText: _obscurePassword,
                   validator: (val) {
-                    if (val != _passwordController.text) return 'Passwords do not match';
+                    if (val != _passwordController.text) {
+                      return 'Passwords do not match';
+                    }
                     return null;
                   },
                 ),
-                
+
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 32),
 
                 SizedBox(
@@ -147,9 +218,17 @@ class _FacultyRegistrationScreenState extends State<FacultyRegistrationScreen> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: _isLoading 
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text('Register', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Text(
+                            'Register',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
                   ),
                 ),
               ],
@@ -169,9 +248,6 @@ class _FacultyRegistrationScreenState extends State<FacultyRegistrationScreen> {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
@@ -180,25 +256,14 @@ class _FacultyRegistrationScreenState extends State<FacultyRegistrationScreen> {
         labelText: label,
         prefixIcon: Icon(icon),
         suffixIcon: suffixIcon,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: theme.primaryColor, width: 2),
-        ),
-        filled: true,
-        fillColor: theme.cardTheme.color,
       ),
-      validator: validator ?? (val) {
-        if (val == null || val.trim().isEmpty) return 'Please enter $label';
-        return null;
-      },
+      validator: validator ??
+          (val) {
+            if (val == null || val.trim().isEmpty) {
+              return 'Please enter $label';
+            }
+            return null;
+          },
     );
   }
 }

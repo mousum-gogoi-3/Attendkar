@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../services/faculty_db_helper.dart';
+import 'package:intl/intl.dart';
+import '../../services/firebase_auth_service.dart';
+import '../../services/firestore_service.dart';
+import '../../models/student_firestore_model.dart';
 
+/// Detailed per-session attendance report for a class.
+/// Uses Firestore as the data source.
 class DetailedReportScreen extends StatefulWidget {
-  final int classId;
+  final String classId;
   final String subjectName;
   final String section;
 
@@ -20,6 +25,7 @@ class DetailedReportScreen extends StatefulWidget {
 class _DetailedReportScreenState extends State<DetailedReportScreen> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _studentStats = [];
+  int _totalSessions = 0;
 
   @override
   void initState() {
@@ -29,55 +35,58 @@ class _DetailedReportScreenState extends State<DetailedReportScreen> {
 
   Future<void> _loadDetailedReport() async {
     setState(() => _isLoading = true);
-    final records = await FacultyDbHelper.instance.getAllAttendanceForClass(widget.classId);
-    final totalUniqueDates = await FacultyDbHelper.instance.getTotalClassesHeld(widget.classId);
-    final closures = await FacultyDbHelper.instance.getAllClosures();
-    final classClosures = await FacultyDbHelper.instance.getAllClassClosures(widget.classId);
-    Set<String> closedDates = closures.map((c) => c['date'] as String).toSet();
-    Set<String> classClosedDates = classClosures.map((c) => c['date'] as String).toSet();
 
-    // Grouping by student ID
-    Map<String, Map<String, int>> statsMap = {};
+    final uid = FirebaseAuthService.getLoggedFacultyUid();
+    if (uid == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
 
-    for (var record in records) {
-      String date = record['date'];
-      if (closedDates.contains(date) || classClosedDates.contains(date)) continue; // Ignore records on closed dates
+    final students = await FirestoreService.getStudentsForSubject(widget.classId);
+    final sessions =
+        await FirestoreService.getSessionsForSubject(widget.classId, uid);
 
-      String studentId = record['student_user_id'].toString();
-      String status = record['status'];
-
-      if (!statsMap.containsKey(studentId)) {
-        statsMap[studentId] = {'present': 0};
-      }
-
-      if (status == 'Present') {
-        statsMap[studentId]!['present'] = statsMap[studentId]!['present']! + 1;
+    // Map studentId -> presentCount
+    final Map<String, int> presentCounts = {};
+    for (final session in sessions) {
+      final records =
+          await FirestoreService.getRecordsForSession(session.sessionId);
+      for (final record in records) {
+        if (record.isPresent) {
+          presentCounts[record.studentId] =
+              (presentCounts[record.studentId] ?? 0) + 1;
+        }
       }
     }
 
-    List<Map<String, dynamic>> formattedStats = [];
-    statsMap.forEach((studentId, stat) {
-      int present = stat['present']!;
-      int absent = totalUniqueDates - present;
-      if (absent < 0) absent = 0; // Prevent negatives just in case
-      
-      double percentage = totalUniqueDates > 0 ? (present / totalUniqueDates) * 100 : 0.0;
-      
-      formattedStats.add({
-        'student_id': studentId,
-        'present': present,
-        'absent': absent,
-        'total': totalUniqueDates,
-        'percentage': percentage,
-      });
-    });
+    final int totalSessions = sessions.length;
 
-    // Sort by roll number alphabetically/numerically
-    formattedStats.sort((a, b) => a['student_id'].compareTo(b['student_id']));
+    // Build stats per student
+    final List<Map<String, dynamic>> stats = students.map((student) {
+      final present = presentCounts[student.studentId] ?? 0;
+      final absent = totalSessions - present;
+      final percentage =
+          totalSessions > 0 ? (present / totalSessions) * 100 : 0.0;
+      return {
+        'student': student,
+        'present': present,
+        'absent': absent < 0 ? 0 : absent,
+        'total': totalSessions,
+        'percentage': percentage,
+      };
+    }).toList();
+
+    // Sort by roll number
+    stats.sort((a, b) {
+      final sa = a['student'] as StudentFirestoreModel;
+      final sb = b['student'] as StudentFirestoreModel;
+      return sa.rollNo.compareTo(sb.rollNo);
+    });
 
     if (mounted) {
       setState(() {
-        _studentStats = formattedStats;
+        _studentStats = stats;
+        _totalSessions = totalSessions;
         _isLoading = false;
       });
     }
@@ -93,8 +102,10 @@ class _DetailedReportScreenState extends State<DetailedReportScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Attendance Report', style: TextStyle(fontSize: 16)),
-            Text('${widget.subjectName} (${widget.section})', 
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal)
+            Text(
+              '${widget.subjectName} (${widget.section})',
+              style: const TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.normal),
             ),
           ],
         ),
@@ -106,11 +117,16 @@ class _DetailedReportScreenState extends State<DetailedReportScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.analytics_outlined, size: 64, color: theme.colorScheme.onSurface.withOpacity(0.2)),
+                      Icon(Icons.analytics_outlined,
+                          size: 64,
+                          color:
+                              theme.colorScheme.onSurface.withOpacity(0.2)),
                       const SizedBox(height: 16),
                       Text(
                         'No attendance records found',
-                        style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.5)),
+                        style: TextStyle(
+                            color:
+                                theme.colorScheme.onSurface.withOpacity(0.5)),
                       ),
                     ],
                   ),
@@ -118,16 +134,22 @@ class _DetailedReportScreenState extends State<DetailedReportScreen> {
               : Column(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                       color: theme.primaryColor.withOpacity(0.05),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Total Students: ${_studentStats.length}', 
-                            style: const TextStyle(fontWeight: FontWeight.bold)
+                          Text(
+                            'Total Students: ${_studentStats.length}',
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          Text('Overall Overview', 
-                            style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold)
+                          Text(
+                            'Sessions: $_totalSessions',
+                            style: TextStyle(
+                                color: theme.primaryColor,
+                                fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -138,11 +160,14 @@ class _DetailedReportScreenState extends State<DetailedReportScreen> {
                         itemCount: _studentStats.length,
                         itemBuilder: (context, index) {
                           final stat = _studentStats[index];
+                          final student =
+                              stat['student'] as StudentFirestoreModel;
                           final percentage = stat['percentage'] as double;
-                          
-                          Color statusColor = percentage >= 75 
-                              ? Colors.green 
-                              : (percentage >= 60 ? Colors.orange : Colors.red);
+                          final Color statusColor = percentage >= 75
+                              ? Colors.green
+                              : (percentage >= 60
+                                  ? Colors.orange
+                                  : Colors.red);
 
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
@@ -150,18 +175,18 @@ class _DetailedReportScreenState extends State<DetailedReportScreen> {
                               padding: const EdgeInsets.all(16.0),
                               child: Row(
                                 children: [
-                                  // Circular Percentage Indicator
                                   SizedBox(
-                                    width: 50,
-                                    height: 50,
+                                    width: 54,
+                                    height: 54,
                                     child: Stack(
                                       fit: StackFit.expand,
                                       children: [
                                         CircularProgressIndicator(
                                           value: percentage / 100,
-                                          backgroundColor: statusColor.withOpacity(0.2),
+                                          backgroundColor:
+                                              statusColor.withOpacity(0.2),
                                           color: statusColor,
-                                          strokeWidth: 4,
+                                          strokeWidth: 5,
                                         ),
                                         Center(
                                           child: Text(
@@ -177,24 +202,32 @@ class _DetailedReportScreenState extends State<DetailedReportScreen> {
                                     ),
                                   ),
                                   const SizedBox(width: 16),
-                                  
-                                  // Student Details
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Roll No / ID: ${stat['student_id']}',
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                          student.name,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16),
                                         ),
                                         const SizedBox(height: 4),
                                         Row(
                                           children: [
-                                            Text('P: ${stat['present']}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                                            Text('Roll: ${student.rollNo}',
+                                                style: TextStyle(
+                                                    color: theme
+                                                        .colorScheme.onSurface
+                                                        .withOpacity(0.6),
+                                                    fontSize: 13)),
                                             const SizedBox(width: 12),
-                                            Text('A: ${stat['absent']}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                                            const SizedBox(width: 12),
-                                            Text('Total: ${stat['total']}', style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6))),
+                                            Text(
+                                                'P: ${stat['present']}  A: ${stat['absent']}',
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 13)),
                                           ],
                                         ),
                                       ],

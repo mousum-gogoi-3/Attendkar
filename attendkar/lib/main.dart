@@ -6,11 +6,12 @@ import 'providers/attendance_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/home_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await HiveService.init();
-
+  await Firebase.initializeApp();
   runApp(
     MultiProvider(
       providers: [

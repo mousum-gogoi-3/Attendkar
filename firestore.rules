@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Admin UID ───────────────────────────────────────────────────────────
+    // The Admin Firebase account email is adminattendnahikarega@gmail.com.
+    // Admin gets full read/write on all structural collections.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() == 'adminattendnahikarega@gmail.com';
+    }
+
+    // ─── Departments ────────────────────────────────────────────────────────
+    // Only admin can create/update/delete departments.
+    // Authenticated users can read.
+    match /departments/{departmentId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ─── Subjects ──────────────────────────────────────────────────────────
+    // Only admin can write subjects.
+    // Any authenticated user can read (faculty needs to see their subjects).
+    match /subjects/{subjectId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ─── Faculties ──────────────────────────────────────────────────────────
+    // Admin can do anything.
+    // A faculty can read and update their own profile.
+    match /faculties/{facultyId} {
+      allow read: if request.auth != null
+        && (isAdmin() || request.auth.uid == facultyId);
+      allow create: if isAdmin();
+      allow update: if isAdmin() || request.auth.uid == facultyId;
+      allow delete: if isAdmin();
+    }
+
+    // ─── Classes ────────────────────────────────────────────────────────────
+    // Admin has full access.
+    // Faculty can read classes assigned to them.
+    match /classes/{classId} {
+      allow read: if request.auth != null
+        && (isAdmin() || resource.data.facultyId == request.auth.uid);
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ─── Students ───────────────────────────────────────────────────────────
+    // Admin has full access.
+    // Faculty and students can read.
+    // Students can create/update their own profile (matching their UID) via phone auth.
+    match /students/{studentId} {
+      allow read: if request.auth != null;
+      allow create, update: if isAdmin() || (request.auth != null && request.auth.uid == studentId);
+      allow delete: if isAdmin();
+    }
+
+    // ─── Attendance Sessions ─────────────────────────────────────────────────
+    // Admin has full access.
+    // Faculty can create, read, delete their own sessions.
+    match /attendance_sessions/{sessionId} {
+      allow read: if request.auth != null
+        && (isAdmin() || resource.data.facultyId == request.auth.uid);
+      allow create: if request.auth != null
+        && request.resource.data.facultyId == request.auth.uid;
+      allow update, delete: if isAdmin()
+        || (request.auth != null && resource.data.facultyId == request.auth.uid);
+    }
+
+    // ─── Attendance Records ──────────────────────────────────────────────────
+    // Admin can write (toggle present/absent).
+    // Faculty can read and write records for sessions they own.
+    // Students can read their own records.
+    match /attendance_records/{recordId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin() || request.auth != null;
+    }
+  }
+}

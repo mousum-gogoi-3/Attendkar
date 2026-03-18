@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../services/faculty_db_helper.dart';
-import '../../../services/faculty_auth_service.dart';
+import '../../../services/firebase_auth_service.dart';
+import '../../../services/firestore_service.dart';
+import '../../../models/subject_model.dart';
+import '../../../widgets/custom_card.dart';
 import '../class_analytics_screen.dart';
 
+/// Reports Tab – shows faculty's assigned classes for analytics.
 class FacultyReportsTab extends StatefulWidget {
   const FacultyReportsTab({super.key});
 
@@ -11,7 +14,7 @@ class FacultyReportsTab extends StatefulWidget {
 }
 
 class _FacultyReportsTabState extends State<FacultyReportsTab> {
-  List<Map<String, dynamic>> _classes = [];
+  List<SubjectModel> _subjects = [];
   bool _isLoading = true;
 
   @override
@@ -22,15 +25,17 @@ class _FacultyReportsTabState extends State<FacultyReportsTab> {
 
   Future<void> _loadClasses() async {
     setState(() => _isLoading = true);
-    final userId = await FacultyAuthService.getLoggedUserId();
-    if (userId != null) {
-      final classes = await FacultyDbHelper.instance.getFacultyClasses(userId);
+    final uid = FirebaseAuthService.getLoggedFacultyUid();
+    if (uid != null) {
+      final subjects = await FirestoreService.getAssignedSubjects(uid);
       if (mounted) {
         setState(() {
-          _classes = classes;
+          _subjects = subjects;
           _isLoading = false;
         });
       }
+    } else {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -39,42 +44,52 @@ class _FacultyReportsTabState extends State<FacultyReportsTab> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Attendance Reports'),
-      ),
+      appBar: AppBar(title: const Text('Attendance Reports')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _classes.isEmpty
+          : _subjects.isEmpty
               ? Center(
                   child: Text(
-                    'No classes available for reports.',
-                    style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.5)),
+                    'No classes assigned yet.',
+                    style: TextStyle(
+                        color: theme.colorScheme.onSurface.withOpacity(0.5)),
                   ),
                 )
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: _classes.length,
+                  itemCount: _subjects.length,
                   itemBuilder: (context, index) {
-                    final cls = _classes[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
+                    final sub = _subjects[index];
+                    return CustomCard(
+                      padding: EdgeInsets.zero,
+                      color: theme.cardTheme.color,
                       child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         leading: CircleAvatar(
+                          radius: 24,
                           backgroundColor: theme.primaryColor.withOpacity(0.1),
-                          child: Icon(Icons.analytics, color: theme.primaryColor),
+                          child: Icon(Icons.analytics,
+                              color: theme.primaryColor),
                         ),
-                        title: Text(cls['subject_name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(
-                          'Dept: ${cls['department']} • Sec: ${cls['section']} • Sem: ${cls['semester']}',
-                          style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                        title: Text(sub.name,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            'Tap to view Analytics',
+                            style: TextStyle(
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.6)),
+                          ),
                         ),
-                        trailing: const Icon(Icons.chevron_right),
+                        trailing: Icon(Icons.arrow_forward_ios_rounded, size: 18, color: theme.colorScheme.onSurface.withOpacity(0.3)),
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => ClassAnalyticsScreen(
-                                classId: cls['class_id'],
-                              ),
+                              builder: (_) =>
+                                  ClassAnalyticsScreen(subjectModel: sub),
                             ),
                           );
                         },
@@ -85,4 +100,3 @@ class _FacultyReportsTabState extends State<FacultyReportsTab> {
     );
   }
 }
-

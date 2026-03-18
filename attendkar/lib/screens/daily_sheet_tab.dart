@@ -78,7 +78,7 @@ class _DailySheetTabState extends State<DailySheetTab> {
                           builder: (_) => StudentClassDetailScreen(
                             classId: cls['class_id'],
                             subjectName: cls['subject_name'],
-                            studentId: cls['student_id'],
+                            rollNo: _rollNo!,
                           ),
                         ),
                       );

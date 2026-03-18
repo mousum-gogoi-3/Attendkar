@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../services/faculty_auth_service.dart';
-import '../../services/faculty_db_helper.dart';
-import 'faculty_registration_screen.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../admin/admin_dashboard_screen.dart';
 import 'faculty_main_screen.dart';
 
 class FacultyLoginScreen extends StatefulWidget {
@@ -16,24 +18,9 @@ class _FacultyLoginScreenState extends State<FacultyLoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   
+  bool _isLoginMode = true; // Still defaults to login
   bool _isLoading = false;
   bool _obscurePassword = true;
-  List<Map<String, dynamic>> _savedAccounts = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSavedAccounts();
-  }
-
-  Future<void> _loadSavedAccounts() async {
-    final accounts = await FacultyDbHelper.instance.getAllSavedAccounts();
-    if (mounted) {
-      setState(() {
-        _savedAccounts = accounts;
-      });
-    }
-  }
 
   @override
   void dispose() {
@@ -42,162 +29,224 @@ class _FacultyLoginScreenState extends State<FacultyLoginScreen> {
     super.dispose();
   }
 
-  Future<void> _login() async {
+  Future<void> _submit() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      bool success = await FacultyAuthService.loginFaculty(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
 
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+      try {
+        if (_isLoginMode) {
+          // --- ADMIN LOGIN REDIRECT CHECK ---
+          if ((email.toLowerCase() == 'adminattendnahikarega@gmail.com' || email.toLowerCase() == 'admin@gmail.com') && 
+              password == 'mainhoonadmin@#\$321') {
+             // Sign into Firebase Auth so Firestore security rules recognise the admin
+             await FirebaseAuth.instance.signInWithEmailAndPassword(
+               email: 'adminattendnahikarega@gmail.com',
+               password: password,
+             );
+             final prefs = await SharedPreferences.getInstance();
+             await prefs.setBool('is_admin_logged_in', true);
+             if (mounted) {
+               Navigator.of(context).pushReplacement(
+                 MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+               );
+             }
+             return;
+          }
 
-      if (success) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const FacultyMainScreen()),
-          (route) => false,
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid credentials or not a faculty account')),
-        );
+          // --- FIREBASE AUTHENTICATION ---
+          UserCredential userCredential;
+          try {
+            userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+              email: email,
+              password: password,
+            );
+          } on FirebaseAuthException catch (e) {
+            if (mounted) _showErrorSnackbar(e.message ?? 'Authentication failed');
+            return;
+          }
+
+          if (userCredential.user == null) {
+            if (mounted) _showErrorSnackbar('Login failed: user object is null.');
+            return;
+          }
+
+          // Verify the user is actually a faculty member
+          final doc = await FirebaseFirestore.instance.collection('faculties').doc(userCredential.user!.uid).get();
+          
+          if (doc.exists && mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const FacultyMainScreen()),
+              (route) => false,
+            );
+          } else {
+            await FirebaseAuth.instance.signOut();
+            if (mounted) _showErrorSnackbar('Account found, but not registered as Faculty.');
+          }
+        }
+      } catch (e) {
+        if (mounted) _showErrorSnackbar('An error occurred: $e');
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
 
-  Future<void> _quickLogin(int userId, String facultyId) async {
-    setState(() => _isLoading = true);
-    await FacultyAuthService.loginWithSavedAccount(userId, facultyId);
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const FacultyMainScreen()),
-      (route) => false,
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(24),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
+    
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Faculty Login'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 24),
-                Icon(Icons.admin_panel_settings, size: 80, color: theme.primaryColor),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
+                
+                // Minimalist header
                 Text(
-                  'Welcome Back!',
-                  textAlign: TextAlign.center,
+                  _isLoginMode ? 'Sign in to portal' : 'Faculty Registration requests are closed natively. Contact Admin.',
                   style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -1,
+                    color: theme.colorScheme.onSurface,
                   ),
-                ),
+                ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.05),
+                
                 const SizedBox(height: 8),
+                
                 Text(
-                  'Enter your credentials to manage classes.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  _isLoginMode
+                      ? 'Welcome back. Please enter your details.'
+                      : 'Faculty accounts are now provisioned by the Administrator.',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.5),
                   ),
-                ),
+                ).animate().fadeIn(delay: 100.ms, duration: 400.ms),
+                
                 const SizedBox(height: 48),
 
-                _buildTextField(
-                  controller: _emailController,
-                  label: 'Email',
-                  icon: Icons.email_outlined,
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                const SizedBox(height: 16),
+                if (_isLoginMode) ...[
+                  // Flat, structured form fields
+                  _buildLabel('Email address', theme),
+                  const SizedBox(height: 8),
+                  _buildTextField(
+                    controller: _emailController,
+                    hint: 'name@university.edu',
+                    icon: Icons.email_outlined,
+                    keyboardType: TextInputType.emailAddress,
+                  ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
+                  
+                  const SizedBox(height: 24),
+                  
+                  _buildLabel('Password', theme),
+                  const SizedBox(height: 8),
+                  _buildTextField(
+                    controller: _passwordController,
+                    hint: '••••••••',
+                    icon: Icons.lock_outline,
+                    obscureText: _obscurePassword,
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                  ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
 
-                _buildTextField(
-                  controller: _passwordController,
-                  label: 'Password',
-                  icon: Icons.lock_outline,
-                  obscureText: _obscurePassword,
-                  suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                  ),
-                ),
+                  const SizedBox(height: 32),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _submit,
+                      child: _isLoading 
+                          ? const SizedBox(
+                              width: 24, height: 24,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            )
+                          : const Text('Sign in'),
+                    ),
+                  ).animate().fadeIn(delay: 200.ms, duration: 400.ms).slideY(begin: 0.1),
+                ],
                 
+                if (!_isLoginMode) ...[
+                  // If they toggled register, just show a message since faculty creation is admin-only now
+                   Container(
+                     padding: const EdgeInsets.all(24),
+                     decoration: BoxDecoration(
+                       color: theme.colorScheme.surface,
+                       borderRadius: BorderRadius.circular(12),
+                       border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
+                     ),
+                     child: Column(
+                       children: [
+                         Icon(Icons.admin_panel_settings_rounded, size: 48, color: theme.colorScheme.primary),
+                         const SizedBox(height: 16),
+                         const Text(
+                           'Account Provisioning',
+                           style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                         ),
+                         const SizedBox(height: 8),
+                         Text(
+                           'To maintain security, faculty accounts are now strictly managed by the system administrator. Please contact IT to provision your account.',
+                           textAlign: TextAlign.center,
+                           style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6), height: 1.5),
+                         )
+                       ],
+                     ),
+                   ).animate().fadeIn()
+                ],
+
                 const SizedBox(height: 32),
 
-                SizedBox(
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _login,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.primaryColor,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: _isLoading 
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text('Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-                
+                // Register toggle
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Are you new? ',
-                      style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                      _isLoginMode ? "Need an account? " : "Already have an account? ",
+                      style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6), fontSize: 14),
                     ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const FacultyRegistrationScreen(),
-                          ),
-                        );
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isLoginMode = !_isLoginMode;
+                          _formKey.currentState?.reset();
+                        });
                       },
-                      child: Text('Register', style: TextStyle(fontWeight: FontWeight.bold, color: theme.primaryColor)),
+                      child: Text(
+                        _isLoginMode ? 'Contact Admin' : 'Sign in', 
+                        style: TextStyle(fontWeight: FontWeight.w700, color: theme.colorScheme.primary, fontSize: 14),
+                      ),
                     ),
                   ],
-                ),
-
-                if (_savedAccounts.isNotEmpty) ...[
-                  const SizedBox(height: 32),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Saved Accounts',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  ..._savedAccounts.map((acc) => Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: theme.primaryColor.withOpacity(0.1),
-                        child: Icon(Icons.admin_panel_settings, color: theme.primaryColor),
-                      ),
-                      title: Text(acc['full_name'] ?? acc['email']),
-                      subtitle: Text(acc['faculty_id'] ?? 'Faculty'),
-                      trailing: const Icon(Icons.login),
-                      onTap: () => _quickLogin(acc['user_id'], acc['faculty_id']),
-                    ),
-                  )),
-                ]
+                ).animate().fadeIn(delay: 400.ms),
               ],
             ),
           ),
@@ -206,42 +255,37 @@ class _FacultyLoginScreenState extends State<FacultyLoginScreen> {
     );
   }
 
+  Widget _buildLabel(String text, ThemeData theme) {
+    return Text(
+      text,
+      style: theme.textTheme.bodyMedium?.copyWith(
+        fontWeight: FontWeight.w600,
+        color: theme.colorScheme.onSurface.withOpacity(0.8),
+      ),
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
-    required String label,
+    required String hint,
     required IconData icon,
     bool obscureText = false,
     Widget? suffixIcon,
     TextInputType? keyboardType,
   }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      style: const TextStyle(fontWeight: FontWeight.w500),
       decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
+        hintText: hint,
+        hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3)),
+        prefixIcon: Icon(icon, size: 20, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
         suffixIcon: suffixIcon,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: theme.primaryColor, width: 2),
-        ),
-        filled: true,
-        fillColor: theme.cardTheme.color,
       ),
       validator: (val) {
-        if (val == null || val.trim().isEmpty) return 'Please enter $label';
+        if (val == null || val.trim().isEmpty) return 'Required';
         return null;
       },
     );

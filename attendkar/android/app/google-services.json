@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "390323470405",
+    "project_id": "attendkar",
+    "storage_bucket": "attendkar.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:390323470405:android:c09d9a0ca93473df96e32c",
+        "android_client_info": {
+          "package_name": "com.attendkardev.app.attendkar"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBNSU-13VB1ytpXisBnvLWScwlM86NMG34"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

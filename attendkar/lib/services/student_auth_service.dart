@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'student_auth_db_helper.dart';
+import 'student_data_service.dart';
 
 class StudentAuthService {
   static const String _isStudentLoggedInKey = 'is_student_logged_in';
@@ -31,6 +32,13 @@ class StudentAuthService {
 
   static Future<bool> registerStudent(String email, String password, String rollNumber) async {
     try {
+      // 1. Verify that the Roll Number has been pre-registered by the Admin
+      // We can use getStudentClasses which queries the Firestore 'students' collection securely.
+      final classes = await StudentDataService.getStudentClasses(rollNumber);
+      if (classes.isEmpty) {
+        throw Exception("Roll number not registered by Admin.");
+      }
+
       final dbHelper = StudentAuthDbHelper.instance;
       String hashedPassword = hashPassword(password);
       
@@ -48,6 +56,9 @@ class StudentAuthService {
 
       return true;
     } catch (e) {
+      if (e.toString().contains("Roll number not registered")) {
+        rethrow;
+      }
       return false; // likely duplicate email
     }
   }

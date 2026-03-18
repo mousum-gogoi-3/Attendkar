@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/hive_service.dart';
 import '../services/faculty_auth_service.dart';
 import '../services/student_auth_service.dart';
@@ -7,6 +8,7 @@ import 'home_screen.dart';
 import 'welcome_screen.dart';
 import 'student_login_screen.dart';
 import 'faculty/faculty_main_screen.dart';
+import 'admin/admin_dashboard_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -23,10 +25,25 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _navigateToNextScreen() async {
-    await Future.delayed(const Duration(milliseconds: 400));
+    await Future.delayed(const Duration(milliseconds: 1000));
     if (!mounted) return;
 
-    // 1. Check Faculty Login
+    final prefs = await SharedPreferences.getInstance();
+
+    // 1. Check Admin Login
+    final isAdminLoggedIn = prefs.getBool('is_admin_logged_in') ?? false;
+    if (isAdminLoggedIn) {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const AdminDashboardScreen(),
+          transitionsBuilder: (_, a, __, c) => FadeTransition(opacity: a, child: c),
+          transitionDuration: const Duration(milliseconds: 500),
+        ),
+      );
+      return;
+    }
+
+    // 2. Check Faculty Login
     final isFacultyLoggedIn = await FacultyAuthService.isFacultyLoggedIn();
     if (isFacultyLoggedIn) {
       Navigator.of(context).pushReplacement(
@@ -39,26 +56,12 @@ class _SplashScreenState extends State<SplashScreen> {
       return;
     }
 
-    // 2. Check Student Login
+    // 3. Check Student Login
     final isStudentLoggedIn = await StudentAuthService.isStudentLoggedIn();
     if (isStudentLoggedIn) {
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (_, __, ___) => const HomeScreen(),
-          transitionsBuilder: (_, a, __, c) => FadeTransition(opacity: a, child: c),
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
-      return;
-    }
-
-    // 3. User is NOT logged in. Check if they have EXISTING student offline data.
-    final hasExistingUnlinkedHiveData = !HiveService.isFirstTimeUser();
-    if (hasExistingUnlinkedHiveData) {
-      // Show Student Login Screen with the Data Migration Popup!
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const StudentLoginScreen(showMigrationPopup: true),
           transitionsBuilder: (_, a, __, c) => FadeTransition(opacity: a, child: c),
           transitionDuration: const Duration(milliseconds: 500),
         ),

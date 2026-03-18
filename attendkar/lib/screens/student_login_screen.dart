@@ -2,15 +2,9 @@ import 'package:flutter/material.dart';
 import '../../services/student_auth_service.dart';
 import '../../services/student_auth_db_helper.dart';
 import 'home_screen.dart';
-import 'onboarding_screen.dart';
 
 class StudentLoginScreen extends StatefulWidget {
-  final bool showMigrationPopup;
-
-  const StudentLoginScreen({
-    super.key,
-    this.showMigrationPopup = false,
-  });
+  const StudentLoginScreen({super.key});
 
   @override
   State<StudentLoginScreen> createState() => _StudentLoginScreenState();
@@ -30,11 +24,6 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.showMigrationPopup) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showMigrationDialog();
-      });
-    }
     _loadSavedAccounts();
   }
 
@@ -55,38 +44,6 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
     super.dispose();
   }
 
-  void _showMigrationDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Welcome back!'),
-        content: const Text(
-          'We have upgraded Attendkar to include secure student accounts! Please create an account by entering your email and password to secure your existing attendance records.\n\nYour data is safe and will not be deleted.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Set mode to register to encourage them to create the account
-              setState(() => _isLoginMode = false);
-            },
-            child: const Text('Create Account'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Skip for now goes straight to home
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const HomeScreen()),
-              );
-            },
-            child: Text('Skip for now', style: TextStyle(color: Colors.grey.shade600)),
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _submit() async {
     if (_formKey.currentState!.validate()) {
@@ -97,39 +54,35 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
       final rollNo = _rollNoController.text.trim();
 
       bool success = false;
+      String? errorMessage;
       
-      if (_isLoginMode) {
-        success = await StudentAuthService.loginStudent(email, password);
-      } else {
-        success = await StudentAuthService.registerStudent(email, password, rollNo);
+      try {
+        if (_isLoginMode) {
+          success = await StudentAuthService.loginStudent(email, password);
+          if (!success) errorMessage = 'Invalid email or password';
+        } else {
+          success = await StudentAuthService.registerStudent(email, password, rollNo);
+          if (!success) errorMessage = 'Failed to create account. Email might already exist.';
+        }
+      } catch (e) {
+        success = false;
+        errorMessage = e.toString().contains("Roll number not registered") 
+            ? "Your Roll Number is not registered by the Admin." 
+            : "An error occurred. Please try again.";
       }
 
       if (!mounted) return;
       setState(() => _isLoading = false);
 
       if (success) {
-        if (widget.showMigrationPopup && !_isLoginMode) {
-          // They are migrating existing data, so go to HomeScreen
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
-          );
-        } else if (!_isLoginMode) {
-          // Brand new user registration, go to Onboarding
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-          );
-        } else {
-          // Normal Login
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
-          );
-        }
+        // Since Admin sets up everything, we skip Onboarding entirely and go straight to Home.
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isLoginMode 
-              ? 'Invalid email or password' 
-              : 'Failed to create account. Email might already exist.'),
+            content: Text(errorMessage ?? 'Authentication failed.'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -260,17 +213,6 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                   ],
                 ),
                 
-                if (widget.showMigrationPopup) ...[
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (_) => const HomeScreen()),
-                      );
-                    },
-                    child: Text('Skip for now', style: TextStyle(color: Colors.grey.shade600)),
-                  ),
-                ],
 
                 if (_savedAccounts.isNotEmpty) ...[
                   const SizedBox(height: 32),

@@ -1,70 +1,80 @@
 import 'package:flutter/material.dart';
-import 'manage_students_screen.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import '../../models/subject_model.dart';
 import 'session_setup_screen.dart';
+import 'manage_students_screen.dart';
 
 class ClassDashboardScreen extends StatelessWidget {
-  final int classId;
-  final String subjectName;
-  final String section;
+  final SubjectModel subjectModel;
 
-  const ClassDashboardScreen({
-    super.key,
-    required this.classId,
-    required this.subjectName,
-    required this.section,
-  });
+  const ClassDashboardScreen({super.key, required this.subjectModel});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(subjectName, style: const TextStyle(fontSize: 18)),
-            Text('Section $section', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal)),
-          ],
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Clean Minimalist Header
+            
+            Text(
+              subjectModel.name,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: -1,
+                color: theme.colorScheme.onSurface,
+              ),
+            ).animate().fadeIn(delay: 100.ms, duration: 400.ms),
+            
+            const SizedBox(height: 16),
+            
+            Row(
+              children: [
+                _buildInfoBadge(Icons.business_rounded, 'Dept ID: ${subjectModel.departmentId}', theme),
+              ],
+            ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
+            
+            const SizedBox(height: 48),
+
+            // SaaS-style Action Cards
             _buildActionCard(
-              context,
-              title: 'Take Attendance',
-              subtitle: 'Start a new attendance session',
-              icon: Icons.how_to_reg,
-              color: Colors.blue,
+              context: context,
+              title: 'Attendance Sessions',
+              subtitle: 'Create & manage attendance records',
+              icon: Icons.event_available_rounded,
+              delay: 300,
               onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => SessionSetupScreen(
-                      classId: classId,
-                      subjectName: subjectName,
-                      section: section,
-                    ),
-                  ),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => SessionSetupScreen(subjectModel: subjectModel)),
                 );
               },
             ),
+
             const SizedBox(height: 16),
+
             _buildActionCard(
-              context,
-              title: 'Manage Students',
-              subtitle: 'Add or edit enrolled students',
-              icon: Icons.people,
-              color: Colors.green,
+              context: context,
+              title: 'Enrolled Students',
+              subtitle: 'View class roster (Managed by Admin)',
+              icon: Icons.people_alt_rounded,
+              delay: 400,
               onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ManageStudentsScreen(
-                      classId: classId,
-                    ),
-                  ),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ManageStudentsScreen(subjectId: subjectModel.subjectId, className: subjectModel.name)),
                 );
               },
             ),
@@ -74,49 +84,87 @@ class ClassDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildActionCard(
-    BuildContext context, {
+  Widget _buildInfoBadge(IconData icon, String text, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.onSurface.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+          const SizedBox(width: 6),
+          Text(text, style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionCard({
+    required BuildContext context,
     required String title,
     required String subtitle,
     required IconData icon,
-    required Color color,
+    required int delay,
     required VoidCallback onTap,
   }) {
     final theme = Theme.of(context);
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: onTap,
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color,
         borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  shape: BoxShape.circle,
+        border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurface.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: theme.colorScheme.primary, size: 28),
                 ),
-                child: Icon(icon, size: 32, color: color),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text(subtitle, style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6))),
-                  ],
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.5), fontSize: 14),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Icon(Icons.chevron_right, color: theme.colorScheme.onSurface.withOpacity(0.4)),
-            ],
+                Icon(Icons.arrow_forward_ios_rounded, size: 16, color: theme.colorScheme.onSurface.withOpacity(0.3)),
+              ],
+            ),
           ),
         ),
       ),
-    );
+    ).animate().fadeIn(delay: delay.ms, duration: 500.ms).slideY(begin: 0.1);
   }
 }

@@ -5,7 +5,7 @@ import 'dart:io';
 
 class FacultyDbHelper {
   static const _databaseName = "attendkar_faculty.db";
-  static const _databaseVersion = 2;
+  static const _databaseVersion = 4;
 
   FacultyDbHelper._privateConstructor();
   static final FacultyDbHelper instance = FacultyDbHelper._privateConstructor();
@@ -46,7 +46,8 @@ class FacultyDbHelper {
         user_id INTEGER NOT NULL,
         full_name TEXT NOT NULL,
         department TEXT NOT NULL,
-        created_at TEXT
+        created_at TEXT,
+        is_verified INTEGER DEFAULT 0
       )
     ''');
 
@@ -58,6 +59,7 @@ class FacultyDbHelper {
         section TEXT NOT NULL,
         semester TEXT NOT NULL,
         department TEXT NOT NULL DEFAULT '',
+        course TEXT NOT NULL DEFAULT '',
         created_at TEXT
       )
     ''');
@@ -122,6 +124,14 @@ class FacultyDbHelper {
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
     // For future upgrades or column additions
     try {
+      if (oldVersion < 3) {
+        await db.execute("ALTER TABLE faculty_profile ADD COLUMN is_verified INTEGER DEFAULT 0");
+      }
+    } catch (e) {
+      // Column might already exist
+    }
+
+    try {
       await db.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'faculty'");
     } catch (e) {
       // Column might already exist
@@ -129,6 +139,14 @@ class FacultyDbHelper {
 
     try {
       await db.execute("ALTER TABLE classes ADD COLUMN department TEXT NOT NULL DEFAULT ''");
+    } catch (e) {
+      // Column might already exist
+    }
+
+    try {
+      if (oldVersion < 4) {
+        await db.execute("ALTER TABLE classes ADD COLUMN course TEXT NOT NULL DEFAULT ''");
+      }
     } catch (e) {
       // Column might already exist
     }
@@ -234,6 +252,16 @@ class FacultyDbHelper {
     return 'FAC${(count + 1).toString().padLeft(3, '0')}';
   }
 
+  Future<int> updateFacultyVerification(int userId, bool isVerified) async {
+    Database db = await instance.database;
+    return await db.update(
+      'faculty_profile',
+      {'is_verified': isVerified ? 1 : 0},
+      where: 'user_id = ?',
+      whereArgs: [userId],
+    );
+  }
+
   // Class Methods
   Future<int> insertClass(Map<String, dynamic> row) async {
     Database db = await instance.database;
@@ -248,6 +276,17 @@ class FacultyDbHelper {
       whereArgs: [facultyUserId],
       orderBy: 'created_at DESC'
     );
+  }
+
+  Future<Map<String, dynamic>?> getClassById(int classId) async {
+    Database db = await instance.database;
+    final res = await db.query(
+      'classes',
+      where: 'class_id = ?',
+      whereArgs: [classId],
+    );
+    if (res.isNotEmpty) return res.first;
+    return null;
   }
 
   // Attendance Methods
@@ -399,6 +438,15 @@ class FacultyDbHelper {
     return await db.insert('class_students', row);
   }
 
+  Future<void> insertClassStudentsBatch(List<Map<String, dynamic>> students) async {
+    Database db = await instance.database;
+    Batch batch = db.batch();
+    for (var student in students) {
+      batch.insert('class_students', student, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+    await batch.commit(noResult: true);
+  }
+
   Future<int> updateClassStudent(int studentId, Map<String, dynamic> row) async {
     Database db = await instance.database;
     return await db.update(
@@ -470,10 +518,10 @@ class FacultyDbHelper {
 
   Future<List<Map<String, dynamic>>> getRecordsForSession(int sessionId) async {
     Database db = await instance.database;
+    // Modified strictly to not join class_students as we will use CSV for metadata.
     return await db.rawQuery('''
-      SELECT ar.*, cs.name, cs.roll_no, cs.department 
+      SELECT ar.* 
       FROM attendance_records ar
-      JOIN class_students cs ON ar.student_id = cs.student_id
       WHERE ar.session_id = ?
     ''', [sessionId]);
   }
