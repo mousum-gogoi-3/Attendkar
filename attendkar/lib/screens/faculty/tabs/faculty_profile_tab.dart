@@ -184,7 +184,7 @@ class _FacultyProfileTabState extends State<FacultyProfileTab> {
                         const SizedBox(width: 16),
                         const Expanded(child: Text('Dark Mode', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16))),
                         Switch.adaptive(
-                          value: Provider.of<AttendanceProvider>(context).userProfile?.isDarkMode ?? false,
+                          value: Provider.of<AttendanceProvider>(context).isDarkMode,
                           onChanged: (val) {
                             Provider.of<AttendanceProvider>(context, listen: false).toggleDarkMode(val);
                           },

@@ -25,7 +25,6 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _navigateToNextScreen() async {
-    await Future.delayed(const Duration(milliseconds: 1000));
     if (!mounted) return;
 
     final prefs = await SharedPreferences.getInstance();

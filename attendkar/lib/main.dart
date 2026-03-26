@@ -29,7 +29,7 @@ class AttendkarApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AttendanceProvider>(
       builder: (context, provider, child) {
-        final isDarkMode = provider.userProfile?.isDarkMode ?? false;
+        final isDarkMode = provider.isDarkMode;
 
         return MaterialApp(
           title: 'Attendkar',

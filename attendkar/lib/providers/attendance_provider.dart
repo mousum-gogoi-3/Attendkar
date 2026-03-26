@@ -8,6 +8,7 @@ import '../models/attendance_status.dart';
 import '../models/university_closed_day.dart';
 import '../models/semester.dart';
 import '../services/hive_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AttendanceProvider with ChangeNotifier {
   UserProfile? _userProfile;
@@ -16,7 +17,10 @@ class AttendanceProvider with ChangeNotifier {
   Map<String, DailySheet> _dailySheets = {};
   Map<String, UniversityClosedDay> _closedDays = {};
 
+  bool _isDarkMode = false;
+
   UserProfile? get userProfile => _userProfile;
+  bool get isDarkMode => _isDarkMode;
   List<Semester> get semesters => _semesters;
   
   // Only return subjects for the active semester
@@ -44,6 +48,9 @@ class AttendanceProvider with ChangeNotifier {
     if (userBox.isNotEmpty) {
       _userProfile = userBox.getAt(0);
     }
+    
+    final prefs = await SharedPreferences.getInstance();
+    _isDarkMode = prefs.getBool('isDarkMode') ?? false;
     
     _semesters = HiveService.getSemestersBox().values.toList();
     _subjects = HiveService.getSubjectsBox().values.toList();
@@ -137,6 +144,8 @@ class AttendanceProvider with ChangeNotifier {
         _userProfile!.activeSemesterId = _semesters.first.id;
       }
 
+      // Preserve dark mode
+      _userProfile!.isDarkMode = _isDarkMode;
       await userBox.add(_userProfile!);
     } else {
       _userProfile!.name = name;
@@ -148,11 +157,14 @@ class AttendanceProvider with ChangeNotifier {
   }
 
   Future<void> toggleDarkMode(bool isDark) async {
+    _isDarkMode = isDark;
     if (_userProfile != null) {
       _userProfile!.isDarkMode = isDark;
       await HiveService.getUserProfileBox().putAt(0, _userProfile!);
-      notifyListeners();
     }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isDarkMode', isDark);
+    notifyListeners();
   }
 
   Future<void> switchSemester(String semesterId) async {
