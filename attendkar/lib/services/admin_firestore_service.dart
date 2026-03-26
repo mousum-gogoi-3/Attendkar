@@ -39,18 +39,20 @@ class AdminFirestoreService {
     }
   }
 
-  static Future<String?> createDepartment(String name) async {
+  static Future<String?> createDepartment(String name, String program) async {
     final ref = await _db.collection('departments').add({
       'name': name.trim(),
+      'program': program.trim(),
       'createdAt': FieldValue.serverTimestamp(),
     });
     return ref.id;
   }
 
   static Future<bool> updateDepartment(
-      String departmentId, String newName) async {
+      String departmentId, String newName, String program) async {
     await _db.collection('departments').doc(departmentId).update({
       'name': newName.trim(),
+      'program': program.trim(),
     });
     return true;
   }
@@ -197,12 +199,16 @@ class AdminFirestoreService {
     required String name,
     required String facultyId,
     required String departmentId,
+    required String semester,
+    required String courseCode,
   }) async {
     try {
       final ref = await _db.collection('subjects').add({
         'name': name.trim(),
         'facultyId': facultyId,
         'departmentId': departmentId,
+        'semester': semester.trim(),
+        'courseCode': courseCode.trim(),
         'createdAt': FieldValue.serverTimestamp(),
       });
       return ref.id;
@@ -211,10 +217,12 @@ class AdminFirestoreService {
     }
   }
 
-  static Future<bool> updateSubject(String subjectId, String name) async {
+  static Future<bool> updateSubject(String subjectId, String name, String semester, String courseCode) async {
     try {
       await _db.collection('subjects').doc(subjectId).update({
         'name': name.trim(),
+        'semester': semester.trim(),
+        'courseCode': courseCode.trim(),
       });
       return true;
     } catch (_) {

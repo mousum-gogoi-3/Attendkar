@@ -5,6 +5,8 @@ class SubjectModel {
   final String name;
   final String facultyId;
   final String departmentId;
+  final String semester;
+  final String courseCode;
   final DateTime? createdAt;
 
   SubjectModel({
@@ -12,6 +14,8 @@ class SubjectModel {
     required this.name,
     required this.facultyId,
     required this.departmentId,
+    this.semester = '',
+    this.courseCode = '',
     this.createdAt,
   });
 
@@ -21,6 +25,8 @@ class SubjectModel {
       name: data['name'] ?? '',
       facultyId: data['facultyId'] ?? '',
       departmentId: data['departmentId'] ?? '',
+      semester: data['semester'] ?? '',
+      courseCode: data['courseCode'] ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     );
   }
@@ -30,16 +36,20 @@ class SubjectModel {
       'name': name,
       'facultyId': facultyId,
       'departmentId': departmentId,
+      'semester': semester,
+      'courseCode': courseCode,
       'createdAt': FieldValue.serverTimestamp(),
     };
   }
 
-  SubjectModel copyWith({String? name}) {
+  SubjectModel copyWith({String? name, String? semester, String? courseCode}) {
     return SubjectModel(
       subjectId: subjectId,
       name: name ?? this.name,
       facultyId: facultyId,
       departmentId: departmentId,
+      semester: semester ?? this.semester,
+      courseCode: courseCode ?? this.courseCode,
       createdAt: createdAt,
     );
   }

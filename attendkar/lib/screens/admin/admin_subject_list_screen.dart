@@ -17,20 +17,43 @@ class AdminSubjectListScreen extends StatelessWidget {
   });
 
   void _showSubjectDialog(BuildContext context, {SubjectModel? existing}) {
-    final controller = TextEditingController(text: existing?.name ?? '');
+    final nameController = TextEditingController(text: existing?.name ?? '');
+    final semesterController = TextEditingController(text: existing?.semester ?? '');
+    final courseCodeController = TextEditingController(text: existing?.courseCode ?? '');
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(existing == null ? 'Add Subject' : 'Edit Subject',
             style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: 'e.g. Data Structures',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'Subject Name (e.g. Data Structures)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: semesterController,
+              decoration: InputDecoration(
+                hintText: 'Semester (e.g. 5)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: courseCodeController,
+              decoration: InputDecoration(
+                hintText: 'Course ID (e.g. CS301)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -38,7 +61,9 @@ class AdminSubjectListScreen extends StatelessWidget {
               child: const Text('Cancel')),
           FilledButton(
             onPressed: () async {
-              final name = controller.text.trim();
+              final name = nameController.text.trim();
+              final semester = semesterController.text.trim();
+              final courseCode = courseCodeController.text.trim();
               if (name.isEmpty) return;
               Navigator.pop(ctx);
               if (existing == null) {
@@ -46,10 +71,12 @@ class AdminSubjectListScreen extends StatelessWidget {
                   name: name,
                   facultyId: faculty.facultyId,
                   departmentId: department.departmentId,
+                  semester: semester,
+                  courseCode: courseCode,
                 );
               } else {
                 await AdminFirestoreService.updateSubject(
-                    existing.subjectId, name);
+                    existing.subjectId, name, semester, courseCode);
               }
             },
             child: Text(existing == null ? 'Add' : 'Save'),
@@ -243,6 +270,20 @@ class _SubjectTile extends StatelessWidget {
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                             color: theme.colorScheme.onSurface)),
+                    if (subject.courseCode.isNotEmpty || subject.semester.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2, bottom: 2),
+                        child: Text(
+                          [
+                            if (subject.courseCode.isNotEmpty) subject.courseCode,
+                            if (subject.semester.isNotEmpty) 'Sem ${subject.semester}'
+                          ].join(' • '),
+                          style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: theme.colorScheme.primary),
+                        ),
+                      ),
                     Text('Tap to manage attendance & students',
                         style: GoogleFonts.outfit(
                             fontSize: 11,

@@ -18,20 +18,34 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   // ─── Department Dialog ────────────────────────────────────────────────────
   void _showDepartmentDialog({DepartmentModel? existing}) {
-    final controller = TextEditingController(text: existing?.name ?? '');
+    final nameController = TextEditingController(text: existing?.name ?? '');
+    final programController = TextEditingController(text: existing?.program ?? '');
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(existing == null ? 'New Department' : 'Edit Department',
             style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: 'e.g. Computer Science',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'Department Name (e.g. Computer Science)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: programController,
+              decoration: InputDecoration(
+                hintText: 'Program (e.g. B.Tech)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -39,12 +53,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               child: const Text('Cancel')),
           FilledButton(
             onPressed: () async {
-              final name = controller.text.trim();
+              final name = nameController.text.trim();
+              final program = programController.text.trim();
               if (name.isEmpty) return;
               Navigator.pop(ctx);
               try {
                 if (existing == null) {
-                  final result = await AdminFirestoreService.createDepartment(name);
+                  final result = await AdminFirestoreService.createDepartment(name, program);
                   if (result == null && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Failed to create department. Please check permissions or network.')),
@@ -52,7 +67,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   }
                 } else {
                   final success = await AdminFirestoreService.updateDepartment(
-                      existing.departmentId, name);
+                      existing.departmentId, name, program);
                   if (!success && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Failed to update department.')),
@@ -333,6 +348,12 @@ class _DepartmentTile extends StatelessWidget {
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: theme.colorScheme.onSurface)),
+                    if (department.program.isNotEmpty)
+                      Text(department.program,
+                          style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: theme.colorScheme.primary)),
                     Text('Tap to manage faculties',
                         style: GoogleFonts.outfit(
                             fontSize: 12,

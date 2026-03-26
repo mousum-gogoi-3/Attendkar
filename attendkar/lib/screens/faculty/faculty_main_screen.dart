@@ -305,6 +305,23 @@ class _FacultyHomeTabState extends State<_FacultyHomeTab> {
                                             ),
                                           ],
                                         ),
+                                        if (cls.courseCode.isNotEmpty || cls.semester.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 6),
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.label_outline_rounded, size: 14, color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  [
+                                                    if (cls.courseCode.isNotEmpty) 'ID: ${cls.courseCode}',
+                                                    if (cls.semester.isNotEmpty) 'Sem: ${cls.semester}'
+                                                  ].join(' • '),
+                                                  style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.6), fontSize: 13),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
                                       ],
                                     ),
                                   ),

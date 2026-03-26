@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/student_firestore_model.dart';
+import '../../models/attendance_session_model.dart';
+import 'student_attendance_details_screen.dart';
 
 /// Detailed per-session attendance report for a class.
 /// Uses Firestore as the data source.
@@ -46,16 +48,31 @@ class _DetailedReportScreenState extends State<DetailedReportScreen> {
     final sessions =
         await FirestoreService.getSessionsForSubject(widget.classId, uid);
 
-    // Map studentId -> presentCount
+    // Map studentId -> List of history items
+    final Map<String, List<Map<String, dynamic>>> studentHistory = {};
+    for (final student in students) {
+      studentHistory[student.studentId] = [];
+    }
+    
     final Map<String, int> presentCounts = {};
     for (final session in sessions) {
       final records =
           await FirestoreService.getRecordsForSession(session.sessionId);
+          
+      final Map<String, bool> sessionRecordMap = {};
       for (final record in records) {
         if (record.isPresent) {
           presentCounts[record.studentId] =
               (presentCounts[record.studentId] ?? 0) + 1;
         }
+        sessionRecordMap[record.studentId] = record.isPresent;
+      }
+      
+      for (final student in students) {
+        studentHistory[student.studentId]?.add({
+          'session': session,
+          'isPresent': sessionRecordMap[student.studentId] ?? false,
+        });
       }
     }
 
@@ -73,6 +90,7 @@ class _DetailedReportScreenState extends State<DetailedReportScreen> {
         'absent': absent < 0 ? 0 : absent,
         'total': totalSessions,
         'percentage': percentage,
+        'history': studentHistory[student.studentId] ?? [],
       };
     }).toList();
 
@@ -90,6 +108,15 @@ class _DetailedReportScreenState extends State<DetailedReportScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  void _showStudentDetails(BuildContext context, Map<String, dynamic> stat) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => StudentAttendanceDetailsScreen(stat: stat),
+      ),
+    );
   }
 
   @override
@@ -171,8 +198,11 @@ class _DetailedReportScreenState extends State<DetailedReportScreen> {
 
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
+                            child: InkWell(
+                              onTap: () => _showStudentDetails(context, stat),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
                               child: Row(
                                 children: [
                                   SizedBox(

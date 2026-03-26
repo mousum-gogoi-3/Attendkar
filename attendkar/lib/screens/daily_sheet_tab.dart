@@ -57,6 +57,8 @@ class _DailySheetTabState extends State<DailySheetTab> {
               itemCount: _classes.length,
               itemBuilder: (context, index) {
                 final cls = _classes[index];
+                final courseCode = cls['course_code'] as String? ?? '';
+                final courseCodeText = courseCode.isNotEmpty ? ' • Course ID: $courseCode' : '';
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   elevation: 2,
@@ -69,7 +71,7 @@ class _DailySheetTabState extends State<DailySheetTab> {
                     title: Text(cls['subject_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     subtitle: Padding(
                       padding: const EdgeInsets.only(top: 8.0),
-                      child: Text('Faculty: ${cls['faculty_name'] ?? 'Unknown'}\nSec: ${cls['section']} • Sem: ${cls['semester']}'),
+                      child: Text('Faculty: ${cls['faculty_name'] ?? 'Unknown'}\nSec: ${cls['section']} • Sem: ${cls['semester']}$courseCodeText'),
                     ),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {

@@ -86,7 +86,12 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
                         value: startTime.format(context),
                         onTap: () async {
                           final time = await showTimePicker(context: context, initialTime: startTime);
-                          if (time != null) setStateDialog(() => startTime = time);
+                          if (time != null) {
+                            setStateDialog(() {
+                              startTime = time;
+                              endTime = TimeOfDay(hour: (startTime.hour + 1) % 24, minute: startTime.minute);
+                            });
+                          }
                         },
                       ),
                     ),
@@ -134,6 +139,19 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
     final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
     final startStr = startTime.format(context);
     final endStr = endTime.format(context);
+
+    // Prevent duplicate sessions with same date and time
+    final sessionExists = _sessions.any((s) => s.date == formattedDate && s.startTime == startStr);
+    if (sessionExists) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('A session already exists for this date and time.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     if (!mounted) return;
     final session = AttendanceSessionModel(

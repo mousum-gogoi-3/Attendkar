@@ -86,6 +86,7 @@ class StudentDataService {
             'section': section ?? '',
             'semester': semester ?? '',
             'department': department ?? '',
+            'course_code': subjectData['courseCode'] as String? ?? '',
             'student_id': doc.id, // the unique document ID representing student's enrollment in this subject
             'faculty_name': facultyName,
             'created_at': (subjectData['createdAt'] as Timestamp?)?.toDate().millisecondsSinceEpoch ?? 0,

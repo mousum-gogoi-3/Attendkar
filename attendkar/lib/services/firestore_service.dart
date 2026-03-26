@@ -229,4 +229,15 @@ class FirestoreService {
     }
     return presentCount;
   }
+
+  // ─── Departments ─────────────────────────────────────────────────────────
+  static Future<Map<String, dynamic>?> getDepartmentById(String departmentId) async {
+    try {
+      final doc = await _db.collection('departments').doc(departmentId).get();
+      if (!doc.exists || doc.data() == null) return null;
+      return doc.data();
+    } catch (_) {
+      return null;
+    }
+  }
 }
