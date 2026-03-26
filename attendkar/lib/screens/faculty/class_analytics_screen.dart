@@ -32,6 +32,7 @@ class _ClassAnalyticsScreenState extends State<ClassAnalyticsScreen> {
   Map<String, int> _presentCounts = {};
   Map<String, List<Map<String, dynamic>>> _studentHistory = {};
   int _totalSessions = 0;
+  String _program = '';
 
   @override
   void initState() {
@@ -96,12 +97,21 @@ class _ClassAnalyticsScreenState extends State<ClassAnalyticsScreen> {
       }
     }
 
+    String program = '';
+    if (widget.subjectModel.departmentId.isNotEmpty) {
+      final dept = await FirestoreService.getDepartmentById(widget.subjectModel.departmentId);
+      if (dept != null) {
+        program = dept['program'] ?? '';
+      }
+    }
+
     if (mounted) {
       setState(() {
         _students = students;
         _totalSessions = filteredSessions.length;
         _presentCounts = presentCounts;
         _studentHistory = studentHistory;
+        _program = program;
         _isLoading = false;
       });
     }
@@ -453,6 +463,8 @@ class _ClassAnalyticsScreenState extends State<ClassAnalyticsScreen> {
                                     'total': _totalSessions,
                                     'percentage': percentage,
                                     'history': _studentHistory[student.studentId] ?? [],
+                                    'subject': widget.subjectModel,
+                                    'program': _program,
                                   };
                                   Navigator.push(
                                     context,

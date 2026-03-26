@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/student_firestore_model.dart';
 import '../../models/attendance_session_model.dart';
+import '../../models/subject_model.dart';
+import '../../services/report_export_service.dart';
 
 class StudentAttendanceDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> stat;
@@ -17,6 +19,7 @@ class _StudentAttendanceDetailsScreenState
     extends State<StudentAttendanceDetailsScreen> {
   DateTime? _filterStart;
   DateTime? _filterEnd;
+  bool _isExporting = false;
 
   List<Map<String, dynamic>> get _allHistory =>
       List<Map<String, dynamic>>.from(widget.stat['history'] ?? []);
@@ -100,6 +103,166 @@ class _StudentAttendanceDetailsScreenState
     });
   }
 
+  void _showDownloadOptions() {
+    bool downloadAll = true;
+    DateTime? tempStart = _filterStart;
+    DateTime? tempEnd = _filterEnd;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 20, right: 20, top: 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('Download Report', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
+                  const Text('Date Range', style: TextStyle(fontWeight: FontWeight.bold)),
+                  RadioListTile<bool>(
+                    title: const Text('All Details'),
+                    value: true,
+                    groupValue: downloadAll,
+                    onChanged: (val) => setModalState(() => downloadAll = val!),
+                  ),
+                  RadioListTile<bool>(
+                    title: const Text('Select Date Range'),
+                    value: false,
+                    groupValue: downloadAll,
+                    onChanged: (val) => setModalState(() => downloadAll = val!),
+                  ),
+                  if (!downloadAll)
+                    ListTile(
+                      title: Text(tempStart != null && tempEnd != null 
+                        ? '${DateFormat('MMM dd, yyyy').format(tempStart!)} - ${DateFormat('MMM dd, yyyy').format(tempEnd!)}'
+                        : 'Tap to select dates'),
+                      trailing: const Icon(Icons.calendar_today),
+                      onTap: () async {
+                        final picked = await showDateRangePicker(
+                          context: context,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                          initialDateRange: tempStart != null && tempEnd != null
+                              ? DateTimeRange(start: tempStart!, end: tempEnd!)
+                              : null,
+                        );
+                        if (picked != null) {
+                          setModalState(() {
+                            tempStart = picked.start;
+                            tempEnd = picked.end;
+                          });
+                        }
+                      },
+                    ),
+                  const SizedBox(height: 20),
+                  const Text('Export Format', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.picture_as_pdf),
+                          label: const Text('PDF'),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade100, foregroundColor: Colors.red.shade900),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _processExport(isPdf: true, isAll: downloadAll, start: tempStart, end: tempEnd);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.table_chart),
+                          label: const Text('Excel'),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade100, foregroundColor: Colors.green.shade900),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _processExport(isPdf: false, isAll: downloadAll, start: tempStart, end: tempEnd);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _processExport({
+    required bool isPdf,
+    required bool isAll,
+    required DateTime? start,
+    required DateTime? end,
+  }) async {
+    setState(() => _isExporting = true);
+
+    try {
+      final student = widget.stat['student'] as StudentFirestoreModel;
+      final subject = widget.stat['subject'] as SubjectModel;
+      final program = widget.stat['program'] as String;
+
+      final exportHistory = _allHistory.where((item) {
+        if (isAll) return true;
+        if (start == null || end == null) return true;
+        final sessionDate = DateTime.parse(item['session'].date);
+        return sessionDate.isAfter(start.subtract(const Duration(days: 1))) &&
+               sessionDate.isBefore(end.add(const Duration(days: 1)));
+      }).toList();
+
+      if (isPdf) {
+        await ReportExportService.exportStudentHistoryToPdf(
+          programName: program.isNotEmpty ? program : 'BTECH',
+          subject: subject,
+          student: student,
+          startDate: isAll ? null : start,
+          endDate: isAll ? null : end,
+          history: exportHistory,
+        );
+      } else {
+        await ReportExportService.exportStudentHistoryToExcel(
+          programName: program.isNotEmpty ? program : 'BTECH',
+          subject: subject,
+          student: student,
+          startDate: isAll ? null : start,
+          endDate: isAll ? null : end,
+          history: exportHistory,
+        );
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Export generated successfully!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to export: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final student = widget.stat['student'] as StudentFirestoreModel;
@@ -116,11 +279,18 @@ class _StudentAttendanceDetailsScreenState
 
     final bool isFiltered = _filterStart != null || _filterEnd != null;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Student Attendance Details',
-            style: TextStyle(fontSize: 16)),
-        actions: [
+    return Stack(
+      children: [
+        Scaffold(
+          appBar: AppBar(
+            title: const Text('Student Attendance Details',
+                style: TextStyle(fontSize: 16)),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.download),
+                tooltip: 'Download Report',
+                onPressed: _showDownloadOptions,
+              ),
           IconButton(
             icon: Icon(isFiltered
                 ? Icons.filter_alt
@@ -409,7 +579,28 @@ class _StudentAttendanceDetailsScreenState
           ),
         ],
       ),
-    );
+    ),
+    if (_isExporting)
+      Container(
+        color: Colors.black54,
+        child: const Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Generating Report...'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+  ],
+);
   }
 }
 

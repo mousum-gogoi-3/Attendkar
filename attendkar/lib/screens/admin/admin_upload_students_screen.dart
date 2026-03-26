@@ -3,6 +3,7 @@ import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../models/subject_model.dart';
 import '../../services/admin_firestore_service.dart';
 
@@ -82,33 +83,59 @@ class _AdminUploadStudentsScreenState
       _csvFileName = null;
       _csvLoading = true;
     });
+
     try {
+      // 1. Request permissions
+      if (Platform.isAndroid) {
+        final status = await Permission.storage.request();
+        if (status.isPermanentlyDenied) {
+          setState(() {
+            _csvLoading = false;
+            _csvError = 'Storage permission permanently denied. Please enable it in Settings.';
+          });
+          return;
+        }
+      }
+
+      // 2. Pick file
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['csv'],
-        withData: true,
+        type: FileType.any, // custom with csv sometimes fails on some Android devices
+        withData: false, // Save memory, use path instead
       );
+
       if (result == null || result.files.isEmpty) {
         setState(() => _csvLoading = false);
         return;
       }
       final file = result.files.first;
-      _csvFileName = file.name;
-
-      String csvString;
-      if (file.bytes != null) {
-        csvString = String.fromCharCodes(file.bytes!);
-      } else if (file.path != null) {
-        csvString = await File(file.path!).readAsString();
-      } else {
+      
+      // Enforce CSV extension manually since FileType.any is used
+      if (!file.name.toLowerCase().endsWith('.csv')) {
         setState(() {
           _csvLoading = false;
-          _csvError = 'Could not read file.';
+          _csvError = 'Please select a valid .csv file.';
         });
         return;
       }
 
-      final rows = CsvToListConverter().convert(csvString);
+      _csvFileName = file.name;
+
+      // 3. Read file
+      String csvString;
+      if (file.path != null) {
+        csvString = await File(file.path!).readAsString();
+      } else if (file.bytes != null) {
+        csvString = String.fromCharCodes(file.bytes!);
+      } else {
+        setState(() {
+          _csvLoading = false;
+          _csvError = 'Could not read file path.';
+        });
+        return;
+      }
+
+      // 4. Parse CSV
+      final rows = const CsvToListConverter(eol: '\n').convert(csvString.replaceAll('\r\n', '\n'));
       if (rows.length < 2) {
         setState(() {
           _csvLoading = false;
@@ -117,11 +144,10 @@ class _AdminUploadStudentsScreenState
         return;
       }
 
-      // Detect header row
-      // Expected: name, department, roll_no, section  (in any order)
+      // 5. Detect header row
       final header =
           rows[0].map((e) => e.toString().trim().toLowerCase()).toList();
-      final nameIdx = _findCol(header, ['name']);
+      final nameIdx = _findCol(header, ['name', 'student name', 'full name']);
       final deptIdx = _findCol(header, ['department', 'dept']);
       final rollIdx = _findCol(header, ['roll_no', 'rollno', 'roll no', 'roll']);
       final sectionIdx = _findCol(header, ['section', 'sec']);

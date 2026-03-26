@@ -338,10 +338,31 @@ class AdminFirestoreService {
       List<Map<String, String>> students, String subjectId,
       {String classId = ''}) async {
     int count = 0;
+    
+    // Fetch existing students to prevent duplicate roll numbers
+    final existingQuery = await _db
+        .collection('students')
+        .where('subjectId', isEqualTo: subjectId)
+        .get();
+    
+    final existingRollNos = existingQuery.docs
+        .map((doc) => doc.data()['rollNo']?.toString().trim())
+        .where((r) => r != null && r.isNotEmpty)
+        .toSet();
+
+    final uniqueStudents = <Map<String, String>>[];
+    for (final student in students) {
+      final rollNo = (student['rollNo'] ?? '').trim();
+      if (rollNo.isNotEmpty && !existingRollNos.contains(rollNo)) {
+        uniqueStudents.add(student);
+        existingRollNos.add(rollNo); // prevent duplicates within the file itself
+      }
+    }
+
     const batchSize = 400;
-    for (int i = 0; i < students.length; i += batchSize) {
-      final chunk = students.sublist(
-          i, i + batchSize > students.length ? students.length : i + batchSize);
+    for (int i = 0; i < uniqueStudents.length; i += batchSize) {
+      final chunk = uniqueStudents.sublist(
+          i, i + batchSize > uniqueStudents.length ? uniqueStudents.length : i + batchSize);
       final batch = _db.batch();
       for (final student in chunk) {
         final ref = _db.collection('students').doc();
