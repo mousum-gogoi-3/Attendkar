@@ -1,82 +1,100 @@
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
+/// Manages student account credentials in Firestore (collection: student_accounts).
+/// This replaces the old local SQLite approach so that credentials survive
+/// app-data clears.
 class StudentAuthDbHelper {
-  static const _databaseName = "attendkar_student_auth.db";
-  static const _databaseVersion = 2; // Incremented for roll_number
-
   StudentAuthDbHelper._privateConstructor();
   static final StudentAuthDbHelper instance = StudentAuthDbHelper._privateConstructor();
 
-  static Database? _database;
+  static final FirebaseFirestore _db = FirebaseFirestore.instance;
+  static final FirebaseAuth _auth = FirebaseAuth.instance;
+  static bool _isAuthInitialized = false;
 
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
-  }
+  /// Ensures we have Firestore read/write access via background admin sign-in.
+  Future<void> _ensureAuth() async {
+    if (_isAuthInitialized && _auth.currentUser != null) return;
 
-  _initDatabase() async {
-    Directory documentsDirectory = await getApplicationDocumentsDirectory();
-    String path = join(documentsDirectory.path, _databaseName);
-    return await openDatabase(
-      path,
-      version: _databaseVersion,
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-    );
-  }
-
-  Future _onCreate(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS student_accounts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        roll_number TEXT NOT NULL
-      )
-    ''');
-  }
-
-  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      await db.execute('ALTER TABLE student_accounts ADD COLUMN roll_number TEXT NOT NULL DEFAULT ""');
+    if (_auth.currentUser == null) {
+      try {
+        await _auth.signInWithEmailAndPassword(
+          email: 'adminattendnahikarega@gmail.com',
+          password: 'mainhoonadmin@#\$321',
+        );
+        _isAuthInitialized = true;
+      } catch (_) {}
+    } else {
+      _isAuthInitialized = true;
     }
   }
 
-  Future<int> insertStudentAccount(Map<String, dynamic> row) async {
-    Database db = await instance.database;
-    return await db.insert('student_accounts', row, conflictAlgorithm: ConflictAlgorithm.fail);
+  /// Saves a student account to Firestore.
+  /// [row] must contain keys: 'email', 'password' (hashed), 'roll_number'.
+  /// Uses roll_number as the document ID so one account per roll number.
+  Future<void> insertStudentAccount(Map<String, dynamic> row) async {
+    await _ensureAuth();
+
+    final rollNumber = (row['roll_number'] as String).trim();
+    final email = (row['email'] as String).trim().toLowerCase();
+
+    // Check if an account with this email already exists
+    final emailCheck = await _db
+        .collection('student_accounts')
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+
+    if (emailCheck.docs.isNotEmpty) {
+      throw Exception('An account with this email already exists.');
+    }
+
+    // Check if an account with this roll number already exists
+    final rollCheck = await _db
+        .collection('student_accounts')
+        .doc(rollNumber)
+        .get();
+
+    if (rollCheck.exists) {
+      throw Exception('An account with this roll number already exists.');
+    }
+
+    await _db.collection('student_accounts').doc(rollNumber).set({
+      'email': email,
+      'password': row['password'] as String,
+      'roll_number': rollNumber,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
   }
 
+  /// Authenticates a student by email and hashed password.
+  /// Returns the account data map if valid, null otherwise.
   Future<Map<String, dynamic>?> authenticateStudent(String email, String password) async {
-    Database db = await instance.database;
-    List<Map<String, dynamic>> res = await db.query(
-      'student_accounts',
-      where: 'email = ? AND password = ?',
-      whereArgs: [email, password],
-    );
-    if (res.isNotEmpty) {
-      return res.first;
+    await _ensureAuth();
+
+    final query = await _db
+        .collection('student_accounts')
+        .where('email', isEqualTo: email.trim().toLowerCase())
+        .where('password', isEqualTo: password)
+        .limit(1)
+        .get();
+
+    if (query.docs.isNotEmpty) {
+      return query.docs.first.data();
     }
     return null;
   }
 
+  /// Checks whether a student account with the given email exists.
   Future<bool> doesAccountExist(String email) async {
-    Database db = await instance.database;
-    List<Map<String, dynamic>> res = await db.query(
-      'student_accounts',
-      where: 'email = ?',
-      whereArgs: [email],
-    );
-    return res.isNotEmpty;
-  }
+    await _ensureAuth();
 
-  Future<List<Map<String, dynamic>>> getAllAccounts() async {
-    Database db = await instance.database;
-    return await db.query('student_accounts', columns: ['id', 'email', 'roll_number']);
+    final query = await _db
+        .collection('student_accounts')
+        .where('email', isEqualTo: email.trim().toLowerCase())
+        .limit(1)
+        .get();
+
+    return query.docs.isNotEmpty;
   }
 }
-

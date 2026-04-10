@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../services/student_auth_service.dart';
-import '../../services/student_auth_db_helper.dart';
 import 'home_screen.dart';
 
 class StudentLoginScreen extends StatefulWidget {
@@ -19,22 +18,6 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
   bool _isLoginMode = true;
   bool _isLoading = false;
   bool _obscurePassword = true;
-  List<Map<String, dynamic>> _savedAccounts = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSavedAccounts();
-  }
-
-  Future<void> _loadSavedAccounts() async {
-    final accounts = await StudentAuthDbHelper.instance.getAllAccounts();
-    if (mounted) {
-      setState(() {
-        _savedAccounts = accounts;
-      });
-    }
-  }
 
   @override
   void dispose() {
@@ -62,20 +45,26 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
           if (!success) errorMessage = 'Invalid email or password';
         } else {
           success = await StudentAuthService.registerStudent(email, password, rollNo);
-          if (!success) errorMessage = 'Failed to create account. Email might already exist.';
+          if (!success) errorMessage = 'Failed to create account. Please try again.';
         }
       } catch (e) {
         success = false;
-        errorMessage = e.toString().contains("Roll number not registered") 
-            ? "Your Roll Number is not registered by the Admin." 
-            : "An error occurred. Please try again.";
+        final msg = e.toString();
+        if (msg.contains("Roll number not registered")) {
+          errorMessage = "Your Roll Number is not registered by the Admin.";
+        } else if (msg.contains("already exists")) {
+          errorMessage = msg.contains("email")
+              ? "An account with this email already exists. Please login instead."
+              : "An account with this roll number already exists. Please login instead.";
+        } else {
+          errorMessage = "An error occurred. Please try again.";
+        }
       }
 
       if (!mounted) return;
       setState(() => _isLoading = false);
 
       if (success) {
-        // Since Admin sets up everything, we skip Onboarding entirely and go straight to Home.
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
@@ -88,15 +77,6 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
         );
       }
     }
-  }
-
-  Future<void> _quickLogin(String email, String rollNo) async {
-    setState(() => _isLoading = true);
-    await StudentAuthService.loginWithSavedAccount(email, rollNo);
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-    );
   }
 
   @override
@@ -212,31 +192,6 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                     ),
                   ],
                 ),
-                
-
-                if (_savedAccounts.isNotEmpty) ...[
-                  const SizedBox(height: 32),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Saved Accounts',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  ..._savedAccounts.map((acc) => Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: theme.primaryColor.withOpacity(0.1),
-                        child: Icon(Icons.person, color: theme.primaryColor),
-                      ),
-                      title: Text(acc['email']),
-                      trailing: const Icon(Icons.login),
-                      onTap: () => _quickLogin(acc['email'], acc['roll_number'] ?? ''),
-                    ),
-                  )),
-                ]
               ],
             ),
           ),

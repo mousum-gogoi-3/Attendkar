@@ -48,10 +48,11 @@ flutter_native_splash:
   color: "#F5F7F6"
   image: "assets/logo.jpg"
   color_dark: "#121212"
-  image_dark: "assets/logo.jpg"
+  image_dark: "assets/logo_dark.jpg"
 
 flutter:
   uses-material-design: true
   assets:
     - assets/logo.jpg
+    - assets/logo_dark.jpg
     - assets/students.csv

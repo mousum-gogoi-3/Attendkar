@@ -89,7 +89,9 @@ class _SplashScreenState extends State<SplashScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Image.asset(
-              'assets/logo.jpg',
+              Theme.of(context).brightness == Brightness.dark 
+                  ? 'assets/logo_dark.jpg' 
+                  : 'assets/logo.jpg',
               width: 150,
               height: 150,
               errorBuilder: (context, error, stackTrace) {

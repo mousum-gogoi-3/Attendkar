@@ -33,7 +33,6 @@ class StudentAuthService {
   static Future<bool> registerStudent(String email, String password, String rollNumber) async {
     try {
       // 1. Verify that the Roll Number has been pre-registered by the Admin
-      // We can use getStudentClasses which queries the Firestore 'students' collection securely.
       final classes = await StudentDataService.getStudentClasses(rollNumber);
       if (classes.isEmpty) {
         throw Exception("Roll number not registered by Admin.");
@@ -59,7 +58,10 @@ class StudentAuthService {
       if (e.toString().contains("Roll number not registered")) {
         rethrow;
       }
-      return false; // likely duplicate email
+      if (e.toString().contains("already exists")) {
+        rethrow;
+      }
+      return false;
     }
   }
 
