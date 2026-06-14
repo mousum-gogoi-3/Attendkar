@@ -48,7 +48,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Welcome to Attendkar'),
+        title: const Text('Welcome to Attend BSSRV'),
         elevation: 0,
         backgroundColor: theme.scaffoldBackgroundColor,
         foregroundColor: theme.colorScheme.onSurface,

@@ -32,7 +32,7 @@ class AttendkarApp extends StatelessWidget {
         final isDarkMode = provider.isDarkMode;
 
         return MaterialApp(
-          title: 'Attendkar',
+          title: 'Attend BSSRV',
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,

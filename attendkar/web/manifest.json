@@ -1,6 +1,6 @@
 {
-    "name": "attendkar",
-    "short_name": "attendkar",
+    "name": "Attend BSSRV",
+    "short_name": "Attend BSSRV",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

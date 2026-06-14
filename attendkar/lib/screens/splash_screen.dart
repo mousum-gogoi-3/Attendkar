@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/hive_service.dart';
 import '../services/faculty_auth_service.dart';
 import '../services/student_auth_service.dart';
@@ -29,21 +30,12 @@ class _SplashScreenState extends State<SplashScreen> {
 
     final prefs = await SharedPreferences.getInstance();
 
-    // 1. Check Admin Login
-    final isAdminLoggedIn = prefs.getBool('is_admin_logged_in') ?? false;
-    if (isAdminLoggedIn) {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const AdminDashboardScreen(),
-          transitionsBuilder: (_, a, __, c) => FadeTransition(opacity: a, child: c),
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
-      return;
-    }
+    // 1. Admin auto-login is disabled for security reasons
+    // Admin must log in manually every time.
 
-    // 2. Check Faculty Login
-    final isFacultyLoggedIn = await FacultyAuthService.isFacultyLoggedIn();
+    // 2. Check Faculty Login using Firebase Auth
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final isFacultyLoggedIn = currentUser != null && currentUser.email != 'adminattendnahikarega@gmail.com' && currentUser.email != 'admin@gmail.com';
     if (isFacultyLoggedIn) {
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
@@ -104,7 +96,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Attendkar',
+              'Attend BSSRV',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: Theme.of(context).primaryColor,

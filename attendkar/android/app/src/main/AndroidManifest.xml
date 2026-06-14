@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.READ_MEDIA_DOCUMENTS"/>
     
     <application
-        android:label="attendkar"
+        android:label="Attend BSSRV"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

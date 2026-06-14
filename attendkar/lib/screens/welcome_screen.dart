@@ -36,7 +36,7 @@ class WelcomeScreen extends StatelessWidget {
                     const SizedBox(height: 32),
                     
                     Text(
-                      'Welcome to\nAttendkar.',
+                      'Welcome to\nAttend BSSRV.',
                       style: theme.textTheme.displayMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                         letterSpacing: -1.5,

@@ -46,8 +46,7 @@ class _FacultyLoginScreenState extends State<FacultyLoginScreen> {
                email: 'adminattendnahikarega@gmail.com',
                password: password,
              );
-             final prefs = await SharedPreferences.getInstance();
-             await prefs.setBool('is_admin_logged_in', true);
+             // We do not save admin login state to force manual login on restart
              if (mounted) {
                Navigator.of(context).pushReplacement(
                  MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),

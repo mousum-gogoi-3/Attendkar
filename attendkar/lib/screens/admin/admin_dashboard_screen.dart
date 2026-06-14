@@ -180,7 +180,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 style: GoogleFonts.outfit(
                                     color: Colors.white.withValues(alpha: 0.7),
                                     fontSize: 13)),
-                            Text('Attendkar',
+                            Text('Attend BSSRV',
                                 style: GoogleFonts.outfit(
                                     color: Colors.white,
                                     fontSize: 22,
